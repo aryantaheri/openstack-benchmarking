@@ -19,11 +19,17 @@ import org.opendaylight.controller.samples.differentiatedforwarding.openstack.pe
 import com.panayotis.gnuplot.JavaPlot;
 import com.panayotis.gnuplot.dataset.Point;
 import com.panayotis.gnuplot.dataset.PointDataSet;
+import com.panayotis.gnuplot.layout.AutoGraphLayout;
+import com.panayotis.gnuplot.layout.GraphLayout;
+import com.panayotis.gnuplot.plot.AbstractPlot;
 import com.panayotis.gnuplot.plot.DataSetPlot;
+import com.panayotis.gnuplot.plot.Plot;
 import com.panayotis.gnuplot.style.PlotStyle;
 import com.panayotis.gnuplot.style.Style;
+import com.panayotis.gnuplot.terminal.DefaultTerminal;
 import com.panayotis.gnuplot.terminal.GNUPlotTerminal;
 import com.panayotis.gnuplot.terminal.PostscriptTerminal;
+import com.panayotis.gnuplot.terminal.SVGTerminal;
 
 public class ClassBasedProcessor {
 
@@ -47,6 +53,12 @@ public class ClassBasedProcessor {
     private static Map<String, List<Point<Number>>> retransDiffDataPointMap = new HashMap<>();
     private static Map<String, List<Point<Number>>> retransSameDataPointMap = new HashMap<>();
 
+    private static Map<String, List<Point<Number>>> reportErrorDataPointMap = new HashMap<>();
+    private static Map<String, List<Point<Number>>> reportErrorDiffDataPointMap = new HashMap<>();
+    private static Map<String, List<Point<Number>>> reportErrorSameDataPointMap = new HashMap<>();
+
+    private static Map<String, List<Point<Number>>> missingValueDataPointMap = new HashMap<>();
+
     private static void findReports(String dirPath){
         File dir = new File(dirPath);
         FileFilter fileFilter = new WildcardFileFilter("*.obj");
@@ -61,7 +73,10 @@ public class ClassBasedProcessor {
     }
 
     public static void main(String[] args) {
-        String dirName = "/tmp/exp-20141128-200441";
+        plotAll("/home/aryan/data/exp-20141205-095731");
+    }
+    public static void main2(String[] args) {
+        String dirName = "/home/aryan/data/exp-20141205-095731";
         findReports(dirName);
         plot(dirName + "/rate.eps", "BW All", "#Instances", "Rate (Mbps)", rateDataPointMap);
         plot(dirName + "/rateD.eps", "BW D", "#Instances", "Rate (Mbps)", rateDiffDataPointMap);
@@ -78,6 +93,12 @@ public class ClassBasedProcessor {
         plot(dirName + "/retrans.eps", "Retrans All", "#Instances", "# retrans", retransDataPointMap);
         plot(dirName + "/retransD.eps", "Retrans D", "#Instances", "# retrans", retransDiffDataPointMap);
         plot(dirName + "/retransS.eps", "Retrans S", "#Instances", "#retrans", retransSameDataPointMap);
+
+        plot(dirName + "/reportError.eps", "reportError All", "#Instances", "# error", reportErrorDataPointMap);
+        plot(dirName + "/reportErrorD.eps", "reportError D", "#Instances", "# error", reportErrorDiffDataPointMap);
+        plot(dirName + "/reportErrorS.eps", "reportError S", "#Instances", "# error", reportErrorSameDataPointMap);
+
+        plot(dirName + "/missingValue.eps", "missingValue All", "#Instances", "# missingValue", missingValueDataPointMap);
     }
 
     private static void processFile(File bwExpReportsFile){
@@ -135,29 +156,43 @@ public class ClassBasedProcessor {
             List<BwExpReport> classReports = classGroups.get(classValue);
             int classNetNum = classReports.size();
             int netInsNum = 0;
+            int missingValueCount = 0;
+
+            int reportErrorCount = 0;
+            int reportErrorCountDiffHyper = 0;
+            int reportErrorCountSameHyper = 0;
+
             for (BwExpReport bwExpReport : classReports) {
                 netInsNum += bwExpReport.getReachableInstances().size();
+                missingValueCount += bwExpReport.getMissingValueCount();
+                reportErrorCount += bwExpReport.getReportErrorCount();
 
                 for (BwReport report : bwExpReport.getBwReports()) {
-                    rateStats.addValue(report.getRate());
-                    cpuRxStats.addValue(report.getReceiverCpu());
-                    cpuTxStats.addValue(report.getTransmitterCpu());
-                    rttStats.addValue(report.getRtt());
-                    retransStats.addValue(report.getRetrans());
+
+                    addValue(rateStats, report.getRate());
+                    addValue(cpuRxStats, report.getReceiverCpu());
+                    addValue(cpuTxStats, report.getTransmitterCpu());
+                    addValue(rttStats, report.getRtt());
+                    addValue(retransStats, report.getRetrans());
 
                     if (report.getReceiverHost().equalsIgnoreCase(report.getTransmitterHost())){
-                        rateStatsSameHyper.addValue(report.getRate());
-                        cpuRxStatsSameHyper.addValue(report.getReceiverCpu());
-                        cpuTxStatsSameHyper.addValue(report.getTransmitterCpu());
-                        rttStatsSameHyper.addValue(report.getRtt());
-                        retransStatsSameHyper.addValue(report.getRetrans());
 
+                        addValue(rateStatsSameHyper, report.getRate());
+                        addValue(cpuRxStatsSameHyper, report.getReceiverCpu());
+                        addValue(cpuTxStatsSameHyper, report.getTransmitterCpu());
+                        addValue(rttStatsSameHyper, report.getRtt());
+                        addValue(retransStatsSameHyper, report.getRetrans());
+
+                        reportErrorCountSameHyper = updateReportErrorCount(report, reportErrorCountSameHyper);
                     } else {
-                        rateStatsDiffHyper.addValue(report.getRate());
-                        cpuRxStatsDiffHyper.addValue(report.getReceiverCpu());
-                        cpuTxStatsDiffHyper.addValue(report.getTransmitterCpu());
-                        rttStatsDiffHyper.addValue(report.getRtt());
-                        retransStatsDiffHyper.addValue(report.getRetrans());
+
+                        addValue(rateStatsDiffHyper, report.getRate());
+                        addValue(cpuRxStatsDiffHyper, report.getReceiverCpu());
+                        addValue(cpuTxStatsDiffHyper, report.getTransmitterCpu());
+                        addValue(rttStatsDiffHyper, report.getRtt());
+                        addValue(retransStatsDiffHyper, report.getRetrans());
+
+                        reportErrorCountDiffHyper = updateReportErrorCount(report, reportErrorCountDiffHyper);
                     }
                 }
             }
@@ -184,8 +219,32 @@ public class ClassBasedProcessor {
             addDataPoints(dataSetName, netInsNum, retransStatsDiffHyper, retransDiffDataPointMap);
             addDataPoints(dataSetName, netInsNum, retransStatsSameHyper, retransSameDataPointMap);
 
+            addDataPoints(dataSetName, netInsNum, reportErrorCount, reportErrorDataPointMap);
+            addDataPoints(dataSetName, netInsNum, reportErrorCountDiffHyper, reportErrorDiffDataPointMap);
+            addDataPoints(dataSetName, netInsNum, reportErrorCountSameHyper, reportErrorSameDataPointMap);
+
+            addDataPoints(dataSetName, netInsNum, missingValueCount, missingValueDataPointMap);
+
+
         }
 
+    }
+
+    private static void addValue(DescriptiveStatistics stats, Float value) {
+        if (value == null){
+            return;
+        } else {
+            stats.addValue(value);
+        }
+    }
+
+    private static int updateReportErrorCount(BwReport report, int reportErrorCount) {
+        if (report.hasError()){
+            reportErrorCount++;
+            return reportErrorCount;
+        } else {
+            return reportErrorCount;
+        }
     }
 
     private static void addDataPoints(String dataSetName, int netInsNum, DescriptiveStatistics stats, Map<String, List<Point<Number>>> dataPointMap) {
@@ -204,19 +263,21 @@ public class ClassBasedProcessor {
         dataPointList.add(mean);
     }
 
+    private static void addDataPoints(String dataSetName, int netInsNum, int value, Map<String, List<Point<Number>>> dataPointMap) {
+        List<Point<Number>> dataPointList = dataPointMap.get(dataSetName);
+        if (dataPointList == null){
+            dataPointList = new ArrayList<>();
+            dataPointMap.put(dataSetName, dataPointList);
+        }
+
+        Point<Number> mean = new Point<Number>(netInsNum, value, value, value);
+        System.out.println("value:" + value);
+        dataPointList.add(mean);
+    }
+
     private static PointDataSet<Number> getSortedPointDataSet(List<Point<Number>> pointListOrig, boolean inverse) {
         PointDataSet<Number> points = new PointDataSet<>();
         List<Point<Number>> pointList = new ArrayList<>();
-//        if (inverse){
-//            pointList = Lists.transform(pointListOrig, new Function<Point<Number>, Point<Number>>() {
-//                @Override
-//                public Point<Number> apply(Point<Number> point) {
-//                    return new Point<Number>(point.get(0), (-1 * point.get(1).doubleValue()));
-//                }
-//            });
-//        } else {
-//            pointList = pointListOrig;
-//        }
         int scale = ((inverse == true) ? -1 : 1);
 
         for (Point<Number> point : pointListOrig) {
@@ -242,7 +303,7 @@ public class ClassBasedProcessor {
         return points;
     }
 
-    private static void plot(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMap) {
+    private static JavaPlot plot(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMap) {
         JavaPlot plot = new JavaPlot();
         plot.getDebugger().setLevel(plot.getDebugger().VERBOSE);
 
@@ -265,9 +326,10 @@ public class ClassBasedProcessor {
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
+        return plot;
     }
 
-    private static void plotInverse(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMapY1, String y2Lable, Map<String, List<Point<Number>>> dataPointMapY2) {
+    private static JavaPlot plotInverse(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMapY1, String y2Lable, Map<String, List<Point<Number>>> dataPointMapY2) {
         JavaPlot plot = new JavaPlot();
         PlotStyle plotStyle = new PlotStyle();
 //        plotStyle.setStyle(Style.LINESPOINTS);
@@ -297,9 +359,10 @@ public class ClassBasedProcessor {
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
+        return plot;
     }
 
-    private static void plot(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMapY1, String y2Lable, Map<String, List<Point<Number>>> dataPointMapY2) {
+    private static JavaPlot plotY1Y2(String plotName, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMapY1, String y2Lable, Map<String, List<Point<Number>>> dataPointMapY2) {
         JavaPlot plot = new JavaPlot();
         PlotStyle plotStyle = new PlotStyle();
 //        plotStyle.setStyle(Style.LINESPOINTS);
@@ -343,6 +406,116 @@ public class ClassBasedProcessor {
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
+        return plot;
+    }
+
+    private static void plotAll(String dirName) {
+
+        findReports(dirName);
+        List<JavaPlot> plots = new ArrayList<>();
+        JavaPlot plot = null;
+        plot = plot(dirName + "/rate.eps", "BW All", "#Instances", "Rate (Mbps)", rateDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/rateD.eps", "BW D", "#Instances", "Rate (Mbps)", rateDiffDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/rateS.eps", "BW S", "#Instances", "Rate (Mbps)", rateSameDataPointMap);
+        plots.add(plot);
+
+        plot = plotInverse(dirName + "/cpu.eps", "CPU Utilization", "#Instances", "Rx CPU", rxCpuDataPointMap, "Tx CPU", txCpuDataPointMap);
+        plots.add(plot);
+        plot = plotInverse(dirName + "/cpuD.eps", "CPU Utilization D", "#Instances", "Rx CPU", rxCpuDiffDataPointMap, "Tx CPU", txCpuDiffDataPointMap);
+        plots.add(plot);
+        plot = plotInverse(dirName + "/cpuS.eps", "CPU Utilization S", "#Instances", "Rx CPU", rxCpuSameDataPointMap, "Tx CPU", txCpuSameDataPointMap);
+        plots.add(plot);
+
+        plot = plot(dirName + "/rtt.eps", "RTT All", "#Instances", "RTT (ms)", rttDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/rttD.eps", "RTT D", "#Instances", "RTT (ms)", rttDiffDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/rttS.eps", "RTT S", "#Instances", "RTT (ms)", rttSameDataPointMap);
+        plots.add(plot);
+
+        plot = plot(dirName + "/retrans.eps", "Retrans All", "#Instances", "# retrans", retransDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/retransD.eps", "Retrans D", "#Instances", "# retrans", retransDiffDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/retransS.eps", "Retrans S", "#Instances", "#retrans", retransSameDataPointMap);
+        plots.add(plot);
+
+        plot = plot(dirName + "/reportError.eps", "reportError All", "#Instances", "# error", reportErrorDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/reportErrorD.eps", "reportError D", "#Instances", "# error", reportErrorDiffDataPointMap);
+        plots.add(plot);
+        plot = plot(dirName + "/reportErrorS.eps", "reportError S", "#Instances", "# error", reportErrorSameDataPointMap);
+        plots.add(plot);
+
+        plot = plot(dirName + "/missingValue.eps", "missingValue All", "#Instances", "# missingValue", missingValueDataPointMap);
+        plots.add(plot);
+
+        plotMultiplePlots(plots);
+    }
+
+    private static void plotMultiplePlots(List<JavaPlot> plots) {
+        JavaPlot plot = new JavaPlot();
+        plot.getDebugger().setLevel(plot.getDebugger().VERBOSE);
+
+        PlotStyle plotStyle = new PlotStyle();
+        plotStyle.setStyle(Style.ERRORLINES);
+
+        JavaPlot allPlot = new JavaPlot();
+//        GNUPlotTerminal term = new PostscriptTerminal("/tmp/all.eps");
+//        GNUPlotTerminal term = new DefaultTerminal();
+//        allPlot.setTerminal(term);
+        allPlot.set("term", "postscript eps size 12,20 enhanced color");
+        allPlot.set("output", "'/tmp/all.eps'");
+        AutoGraphLayout layout = new AutoGraphLayout();
+        layout.setColumns(3);
+//        layout.setRows(5);
+        allPlot.getPage().setLayout(layout);
+
+        for (JavaPlot javaPlot : plots) {
+            for (Plot dsp : javaPlot.getPlots()) {
+                allPlot.addPlot(dsp);
+            }
+            allPlot.newGraph();
+        }
+        allPlot.plot();
+//        GNUPlotTerminal term = new SVGTerminal("/tmp/all.svg");
+//        allPlot.plot();
+
+        //
+//      for (String dataSetName : dataPointMap.keySet()) {
+//          DataSetPlot dataSetPlot = new DataSetPlot(getSortedPointDataSet(dataPointMap.get(dataSetName), false));
+//          dataSetPlot.setPlotStyle(plotStyle);
+//          dataSetPlot.setTitle(dataSetName);
+//          plot.addPlot(dataSetPlot);
+//      }
+//
+//      plot.setKey(JavaPlot.Key.TOP_RIGHT);
+//      plot.getAxis("x").setLabel(xLable);
+//      plot.getAxis("y").setLabel(yLable);
+//      plot.set("xzeroaxis", "");
+//      plot.setTitle(plotTitle);
+//      GNUPlotTerminal term = new PostscriptTerminal(plotName);
+//      plot.setTerminal(term);
+//      plot.plot();
+
+//      double[][] original1 = {{2,3},{4,5},{6,7}};
+//      double[][] original2 = {{8,9},{12,13},{14,15}};
+//      AbstractPlot originalPlot = new DataSetPlot(original1);
+//      originalPlot.setTitle("original1");
+//      AbstractPlot originalPlot2 = new DataSetPlot(original2);
+//      originalPlot2.setTitle("original2");
+//
+//
+//      JavaPlot p = new JavaPlot();
+//
+//      p.addPlot(originalPlot);
+//      p.newGraph();
+//      p.addPlot(originalPlot2);
+//      p.setTerminal(new PostscriptTerminal("/tmp/all.eps"));
+//      p.plot();
+
     }
 
     private static String getDataSetName(int classValue, int classNetNum) {
