@@ -16,7 +16,7 @@ import org.opendaylight.controller.samples.differentiatedforwarding.openstack.pe
 import com.panayotis.gnuplot.JavaPlot;
 import com.panayotis.gnuplot.dataset.Point;
 
-public class CompareExecTypes {
+public class CompareStrategyTypes {
 
     private static Map<String, List<Point<Number>>> rateDataPointMap = new HashMap<>();
     private static Map<String, List<Point<Number>>> rateDiffDataPointMap = new HashMap<>();
@@ -45,22 +45,23 @@ public class CompareExecTypes {
     private static Map<String, List<Point<Number>>> missingValueDataPointMap = new HashMap<>();
 
     private static final double BOX_WIDTH = 0.1;
-    public static String[] strategies = {"none", "meter", "queue", "meter_queue"};
-//    private static String[] strategies = {"meter"};
+
     public static void main(String[] args) {
 
         String dirPath = "/home/aryan/data/useful";
-
-        for (String strategy : strategies) {
-            initDataPointMaps();
-            List<File> expFiles = loadReports(dirPath, strategy);
-            System.out.println("[strategy=" + strategy  + "] expFiles -> " + expFiles);
-            processStrategyFiles(expFiles, strategy);
-            plotStrategy(dirPath, strategy);
+        boolean[] classExecTypes = {false, true};
+        boolean[] instanceExecTypes = {false, true};
+        for (boolean c : classExecTypes) {
+            for (boolean i : instanceExecTypes) {
+                initDataPointMaps();
+                List<File> expFiles = loadReports(dirPath, c, i);
+                processExecTypeFiles(expFiles, c, i);
+                plotExecType(dirPath, c, i);
+            }
         }
+
+
     }
-
-
 
     private static void initDataPointMaps() {
         rateDataPointMap = new HashMap<>();
@@ -91,59 +92,62 @@ public class CompareExecTypes {
 
     }
 
-    private static List<File> loadReports(String dirPath, String strategy) {
-        File rootDir = getStrategyRootDir(dirPath, strategy);
-        System.out.println("[strategy=" + strategy  + "] rootDir: " + rootDir);
+    private static List<File> loadReports(String dirPath, boolean classConcurrency, boolean instanceConcurrency) {
         List<File> expFiles = new ArrayList<>();
+        File[] rootDirs = new File[CompareExecTypes.strategies.length];
+        for (int i = 0; i < CompareExecTypes.strategies.length; i++) {
+            rootDirs[i] = CompareExecTypes.getStrategyRootDir(dirPath, CompareExecTypes.strategies[i]);
+            File[] dirs = rootDirs[i].listFiles();
+            FileFilter fileFilter = new WildcardFileFilter("classes*[con=" + classConcurrency + "]*[con=" + instanceConcurrency +"]*.obj");
+            for (File expDir : dirs) {
 
-        File[] dirs = rootDir.listFiles();
-        System.out.println("[strategy=" + strategy  + "] expDirs: " + Arrays.toString(dirs));
+                File[] files = expDir.listFiles(fileFilter);
+                if (files == null) continue;
 
-        FileFilter fileFilter = new WildcardFileFilter("*.obj");
-        for (File expDir : dirs) {
+                List<File> fileList = Arrays.asList(files);
+                Collections.sort(fileList);
+                expFiles.addAll(fileList);
 
-            File[] files = expDir.listFiles(fileFilter);
-            if (files == null) continue;
-
-            List<File> fileList = Arrays.asList(files);
-            Collections.sort(fileList);
-            expFiles.addAll(fileList);
-
+            }
         }
+        System.out.println("[c=" + classConcurrency  + ", i=" + instanceConcurrency + "] expFiles -> " + expFiles);
         return expFiles;
     }
 
-    private static void processStrategyFiles(List<File> expFiles, String strategy) {
+    private static void processExecTypeFiles(List<File> expFiles, boolean classConcurrency, boolean instanceConcurrency) {
         for (File bwExpReportFile : expFiles) {
-            processFile(bwExpReportFile, strategy);
+            processFile(bwExpReportFile, classConcurrency, instanceConcurrency);
         }
     }
 
-    private static void processFile(File bwExpReportsFile, String strategy){
+    private static void processFile(File bwExpReportsFile, boolean classConcurrency, boolean instanceConcurrency) {
         List<BwExpReport> bwExpReports = ReportManager.readReportObjects(bwExpReportsFile.getAbsolutePath());
-        boolean classConsurrency = ClassBasedProcessor.areClassesConcurrent(bwExpReportsFile.getName());
-        boolean instanceConsurrency = ClassBasedProcessor.areInstancesConcurrent(bwExpReportsFile.getName());;
+        boolean classC = ClassBasedProcessor.areClassesConcurrent(bwExpReportsFile.getName());
+        boolean instanceC = ClassBasedProcessor.areInstancesConcurrent(bwExpReportsFile.getName());;
         int[] classes = ClassBasedProcessor.getClasses(bwExpReportsFile.getName());
         int netNum = ClassBasedProcessor.getNetNum(bwExpReportsFile.getName());
         int insNum = ClassBasedProcessor.getInsNum(bwExpReportsFile.getName());
+        String strategy = getStrategy(bwExpReportsFile);
         System.out.println(bwExpReportsFile.getName());
-        System.out.println(classConsurrency);
-        System.out.println(instanceConsurrency);
+        System.out.println(classC);
+        System.out.println(instanceC);
         System.out.println(Arrays.toString(classes));
         System.out.println(netNum);
         System.out.println(insNum);
-
-
-        for (BwExpReport bwExpReport : bwExpReports) {
-            setExecTypeDataPoins(bwExpReport);
+        System.out.println("Strategy=" + strategy);
+        if (classC != classConcurrency || instanceC != instanceConcurrency) {
+            System.err.println("Inconsistency between classConcurrency and instanceConcurrency of inputs");
+            System.exit(-1);
         }
 
+        for (BwExpReport bwExpReport : bwExpReports) {
+            setStrategyDataPoins(bwExpReport, strategy);
+        }
     }
 
-
-    private static void setExecTypeDataPoins(BwExpReport bwExpReport) {
-        String dataSetName = getDataSetName(bwExpReport);
-        double xOffset = calcXOffset(bwExpReport);
+    private static void setStrategyDataPoins(BwExpReport bwExpReport, String strategy) {
+        String dataSetName = getDataSetName(bwExpReport, strategy);
+        double xOffset = calcXOffset(bwExpReport, strategy);
 
         Utils.addDataPointsWithMinMax(dataSetName, bwExpReport.getClassValue(), xOffset, BOX_WIDTH, bwExpReport.getRateStats(), rateDataPointMap);
         Utils.addDataPointsWithMinMax(dataSetName, bwExpReport.getClassValue(), xOffset, BOX_WIDTH, bwExpReport.getRateStatsDiffHyper(), rateDiffDataPointMap);
@@ -170,78 +174,74 @@ public class CompareExecTypes {
 
     }
 
-    private static void plotStrategy(String dirPath, String strategy) {
-        File dir = getStrategyRootDir(dirPath, strategy);
-        String plotPrefix = "CompareExec-"+strategy+"-";
+    private static void plotExecType(String dirPath, boolean classConcurrency, boolean instanceConcurrency) {
+        File dir = new File(dirPath);
+        String execType = "c:"+classConcurrency+",i:" + instanceConcurrency;
+        String plotPrefix = "CompareStrategy-"+ execType +"-";
         List<JavaPlot> plots = new ArrayList<>();
         JavaPlot plot = null;
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rate.eps", "BW All (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rate.eps", "BW All (ExecType=" + execType + ")", "Class", "Rate (Mbps)", rateDataPointMap);
         plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rateD.eps", "BW D (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateDiffDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rateD.eps", "BW D (ExecType=" + execType + ")", "Class", "Rate (Mbps)", rateDiffDataPointMap);
         plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix,  "rateS.eps", "BW S (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateSameDataPointMap);
-        plots.add(plot);
-
-        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpu.eps", "CPU Utilization (Strategy=" + strategy + ")", "Class", "Rx CPU", cpuRxDataPointMap, "Tx CPU", cpuTxDataPointMap);
-        plots.add(plot);
-        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuD.eps", "CPU Utilization D (Strategy=" + strategy + ")", "Class", "Rx CPU", cpuRxDiffDataPointMap, "Tx CPU", cpuTxDiffDataPointMap);
-        plots.add(plot);
-        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuS.eps", "CPU Utilization S (Strategy=" + strategy + ")", "Class", "Rx CPU", cpuRxSameDataPointMap, "Tx CPU", cpuTxSameDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix,  "rateS.eps", "BW S (ExecType=" + execType + ")", "Class", "Rate (Mbps)", rateSameDataPointMap);
         plots.add(plot);
 
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rtt.eps", "RTT All (Strategy=" + strategy + ")", "Class", "RTT (ms)", rttDataPointMap);
+        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpu.eps", "CPU Utilization (ExecType=" + execType + ")", "Class", "Rx CPU", cpuRxDataPointMap, "Tx CPU", cpuTxDataPointMap);
         plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttD.eps", "RTT D (Strategy=" + strategy + ")", "Class", "RTT (ms)", rttDiffDataPointMap);
+        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuD.eps", "CPU Utilization D (ExecType=" + execType + ")", "Class", "Rx CPU", cpuRxDiffDataPointMap, "Tx CPU", cpuTxDiffDataPointMap);
         plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttS.eps", "RTT S (Strategy=" + strategy + ")", "Class", "RTT (ms)", rttSameDataPointMap);
+        plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuS.eps", "CPU Utilization S (ExecType=" + execType + ")", "Class", "Rx CPU", cpuRxSameDataPointMap, "Tx CPU", cpuTxSameDataPointMap);
         plots.add(plot);
 
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retrans.eps", "Retrans All (Strategy=" + strategy + ")", "Class", "# retrans", retransDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rtt.eps", "RTT All (ExecType=" + execType + ")", "Class", "RTT (ms)", rttDataPointMap);
+        plots.add(plot);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttD.eps", "RTT D (ExecType=" + execType + ")", "Class", "RTT (ms)", rttDiffDataPointMap);
+        plots.add(plot);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttS.eps", "RTT S (ExecType=" + execType + ")", "Class", "RTT (ms)", rttSameDataPointMap);
+        plots.add(plot);
+
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retrans.eps", "Retrans All (ExecType=" + execType + ")", "Class", "# retrans", retransDataPointMap);
 //        plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransD.eps", "Retrans D (Strategy=" + strategy + ")", "Class", "# retrans", retransDiffDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransD.eps", "Retrans D (ExecType=" + execType + ")", "Class", "# retrans", retransDiffDataPointMap);
 //        plots.add(plot);
-        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransS.eps", "Retrans S (Strategy=" + strategy + ")", "Class", "#retrans", retransSameDataPointMap);
+        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransS.eps", "Retrans S (ExecType=" + execType + ")", "Class", "#retrans", retransSameDataPointMap);
 //        plots.add(plot);
 
-        plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "reportError.eps", "reportError All (Strategy=" + strategy + ")", "Class", "# error", reportErrorDataPointMap);
+        plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "reportError.eps", "reportError All (ExecType=" + execType + ")", "Class", "# error", reportErrorDataPointMap);
 //        plots.add(plot);
 
-//        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "reportErrorD.eps", "reportError D (Strategy=" + strategy + ")", "Class", "# error", reportErrorDiffDataPointMap);
+//        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "reportErrorD.eps", "reportError D (ExecType=" + execType + ")", "Class", "# error", reportErrorDiffDataPointMap);
 //        plots.add(plot);
-//        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "reportErrorS.eps", "reportError S (Strategy=" + strategy + ")", "Class", "# error", reportErrorSameDataPointMap);
+//        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "reportErrorS.eps", "reportError S (ExecType=" + execType + ")", "Class", "# error", reportErrorSameDataPointMap);
 //        plots.add(plot);
 
-        plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "missingValue.eps", "missingValue All (Strategy=" + strategy + ")", "Class", "# missingValue", missingValueDataPointMap);
+        plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "missingValue.eps", "missingValue All (ExecType=" + execType + ")", "Class", "# missingValue", missingValueDataPointMap);
 //        plots.add(plot);
 
         Plotter.plotMultipleBoxPlots(dir.getAbsolutePath(), plotPrefix, "all.eps", plots);
     }
 
-
-
-
-    private static String getDataSetName(BwExpReport bwExpReport) {
-        return "c="+bwExpReport.isRunClassExpConcurrently() + ",i="+bwExpReport.isRunInstanceExpConcurrently();
+    private static String getDataSetName(BwExpReport bwExpReport, String strategy) {
+        return strategy;
     }
 
-    private static double calcXOffset(BwExpReport bwExpReport) {
-        int offset = 0;
+    private static String getStrategy(File bwExpReportsFile) {
+        for (int i = 0; i < CompareExecTypes.strategies.length; i++) {
+            if (bwExpReportsFile.getAbsolutePath().contains("strategy="+CompareExecTypes.strategies[i])){
+                return CompareExecTypes.strategies[i];
+            }
+        }
+        return null;
+    }
+
+    private static double calcXOffset(BwExpReport bwExpReport, String strategy) {
         double scale = BOX_WIDTH;
-        if (bwExpReport.isRunClassExpConcurrently()){
-            offset -= 2;
-        } else {
-            offset = 0;
+        for (int i = 0; i < CompareExecTypes.strategies.length; i++) {
+            if (strategy.equalsIgnoreCase(CompareExecTypes.strategies[i])){
+                return (i - CompareExecTypes.strategies.length/2) * scale;
+            }
         }
-        if (bwExpReport.isRunInstanceExpConcurrently()){
-            offset++;
-        } else {
-//            offset--;
-        }
-        return offset * scale;
-    }
-
-    public static File getStrategyRootDir(String dirPath, String strategy){
-        File rootDir = new File(dirPath + "/strategy="+strategy);
-        return rootDir;
+        return (CompareExecTypes.strategies.length/2 + 0.5) * scale;
     }
 }
