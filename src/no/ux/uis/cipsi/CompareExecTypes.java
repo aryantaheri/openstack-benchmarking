@@ -18,6 +18,8 @@ import com.panayotis.gnuplot.dataset.Point;
 
 public class CompareExecTypes {
 
+    public static Map<String, List<JavaPlot>> summaryPlotMap = new HashMap<>();
+
     private static Map<String, List<Point<Number>>> rateDataPointMap = new HashMap<>();
     private static Map<String, List<Point<Number>>> rateDiffDataPointMap = new HashMap<>();
     private static Map<String, List<Point<Number>>> rateSameDataPointMap = new HashMap<>();
@@ -44,12 +46,12 @@ public class CompareExecTypes {
 
     private static Map<String, List<Point<Number>>> missingValueDataPointMap = new HashMap<>();
 
-    private static final double BOX_WIDTH = 0.1;
+    private static final double BOX_WIDTH = 0.15;
     public static String[] strategies = {"none", "meter", "queue", "meter_queue"};
 //    private static String[] strategies = {"meter"};
     public static void main(String[] args) {
 
-        String dirPath = "/home/aryan/data/useful";
+        String dirPath = "/home/aryan/data/10min";
 
         for (String strategy : strategies) {
             initDataPointMaps();
@@ -174,11 +176,14 @@ public class CompareExecTypes {
         File dir = getStrategyRootDir(dirPath, strategy);
         String plotPrefix = "CompareExec-"+strategy+"-";
         List<JavaPlot> plots = new ArrayList<>();
+        List<JavaPlot> summaryPlots = new ArrayList<>();
+
         JavaPlot plot = null;
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rate.eps", "BW All (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateDataPointMap);
         plots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rateD.eps", "BW D (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateDiffDataPointMap);
         plots.add(plot);
+        summaryPlots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix,  "rateS.eps", "BW S (Strategy=" + strategy + ")", "Class", "Rate (Mbps)", rateSameDataPointMap);
         plots.add(plot);
 
@@ -186,6 +191,7 @@ public class CompareExecTypes {
         plots.add(plot);
         plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuD.eps", "CPU Utilization D (Strategy=" + strategy + ")", "Class", "Rx CPU", cpuRxDiffDataPointMap, "Tx CPU", cpuTxDiffDataPointMap);
         plots.add(plot);
+        summaryPlots.add(plot);
         plot = Plotter.plotInverseBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "cpuS.eps", "CPU Utilization S (Strategy=" + strategy + ")", "Class", "Rx CPU", cpuRxSameDataPointMap, "Tx CPU", cpuTxSameDataPointMap);
         plots.add(plot);
 
@@ -193,18 +199,21 @@ public class CompareExecTypes {
         plots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttD.eps", "RTT D (Strategy=" + strategy + ")", "Class", "RTT (ms)", rttDiffDataPointMap);
         plots.add(plot);
+        summaryPlots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "rttS.eps", "RTT S (Strategy=" + strategy + ")", "Class", "RTT (ms)", rttSameDataPointMap);
         plots.add(plot);
 
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retrans.eps", "Retrans All (Strategy=" + strategy + ")", "Class", "# retrans", retransDataPointMap);
-//        plots.add(plot);
+        plots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransD.eps", "Retrans D (Strategy=" + strategy + ")", "Class", "# retrans", retransDiffDataPointMap);
-//        plots.add(plot);
+        plots.add(plot);
+        summaryPlots.add(plot);
         plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "retransS.eps", "Retrans S (Strategy=" + strategy + ")", "Class", "#retrans", retransSameDataPointMap);
-//        plots.add(plot);
+        plots.add(plot);
 
         plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "reportError.eps", "reportError All (Strategy=" + strategy + ")", "Class", "# error", reportErrorDataPointMap);
-//        plots.add(plot);
+        plots.add(plot);
+        summaryPlots.add(plot);
 
 //        plot = Plotter.plotBoxWithMinMax(dir.getAbsolutePath(), plotPrefix, "reportErrorD.eps", "reportError D (Strategy=" + strategy + ")", "Class", "# error", reportErrorDiffDataPointMap);
 //        plots.add(plot);
@@ -212,8 +221,10 @@ public class CompareExecTypes {
 //        plots.add(plot);
 
         plot = Plotter.plotBox(dir.getAbsolutePath(), plotPrefix, "missingValue.eps", "missingValue All (Strategy=" + strategy + ")", "Class", "# missingValue", missingValueDataPointMap);
-//        plots.add(plot);
+        plots.add(plot);
+        summaryPlots.add(plot);
 
+        summaryPlotMap.put(strategy, summaryPlots);
         Plotter.plotMultipleBoxPlots(dir.getAbsolutePath(), plotPrefix, "all.eps", plots);
     }
 

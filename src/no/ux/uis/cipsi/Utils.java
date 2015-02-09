@@ -50,6 +50,11 @@ public class Utils {
         List<Point<Number>> pointList = new ArrayList<>();
         int scale = ((inverse == true) ? -1 : 1);
 
+        // Fail-safe behavior
+        if (pointListOrig == null || pointListOrig.size() == 0) {
+            points.add(new Point(0));
+        }
+
         for (Point<Number> point : pointListOrig) {
             pointList.add(new Point<Number>(point.get(0),
                                             (scale * point.get(1).doubleValue())
@@ -80,6 +85,11 @@ public class Utils {
         PointDataSet<Number> points = new PointDataSet<>();
         List<Point<Number>> pointList = new ArrayList<>();
         int scale = ((inverse == true) ? -1 : 1);
+
+        // Fail-safe behavior
+        if (pointListOrig == null || pointListOrig.size() == 0) {
+            points.add(new Point(0));
+        }
 
         for (Point<Number> point : pointListOrig) {
             pointList.add(new Point<Number>(point.get(0),

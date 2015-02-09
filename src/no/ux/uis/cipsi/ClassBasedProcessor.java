@@ -518,19 +518,19 @@ public class ClassBasedProcessor {
 
     }
 
-    private static String getDataSetName(int classValue, int classNetNum) {
+    public static String getDataSetName(int classValue, int classNetNum) {
         return "class:"+classValue+"-nets:"+classNetNum;
     }
 
-    private static boolean areClassesConcurrent(String reportFileName){
+    public static boolean areClassesConcurrent(String reportFileName){
         return reportFileName.matches(".*classes.*\\[con=true\\].*\\[con=.*");
     }
 
-    private static boolean areInstancesConcurrent(String reportFileName){
+    public static boolean areInstancesConcurrent(String reportFileName){
         return reportFileName.matches(".*classes.*\\[con=.*\\].*\\[con=true\\].*");
     }
 
-    private static int[] getClasses(String reportFileName){
+    public static int[] getClasses(String reportFileName){
         String[] classes = reportFileName.split("\\]\\[")[0].split("\\[")[1].split(",");
         int[] c = new int[classes.length];
 
@@ -540,11 +540,11 @@ public class ClassBasedProcessor {
         return c;
     }
 
-    private static int getNetNum(String reportFileName) {
+    public static int getNetNum(String reportFileName) {
         return Integer.parseInt(reportFileName.split("nets")[1].split("-")[0]);
     }
 
-    private static int getInsNum(String reportFileName) {
+    public static int getInsNum(String reportFileName) {
         return Integer.parseInt(reportFileName.split("instances")[1].split("\\[")[0]);
     }
 }

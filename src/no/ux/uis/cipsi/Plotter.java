@@ -3,11 +3,9 @@ package no.ux.uis.cipsi;
 import java.util.List;
 import java.util.Map;
 
-import com.panayotis.gnuplot.GNUPlotParameters;
 import com.panayotis.gnuplot.JavaPlot;
 import com.panayotis.gnuplot.dataset.Point;
 import com.panayotis.gnuplot.layout.AutoGraphLayout;
-import com.panayotis.gnuplot.plot.AbstractPlot;
 import com.panayotis.gnuplot.plot.DataSetPlot;
 import com.panayotis.gnuplot.plot.Plot;
 import com.panayotis.gnuplot.style.PlotStyle;
@@ -18,6 +16,7 @@ import com.panayotis.gnuplot.terminal.PostscriptTerminal;
 public class Plotter {
 
 
+    static boolean addTitle = false;
     public static JavaPlot plotBoxWithMinMax(String plotDir, String plotPrefix, String plotSuffix, String plotTitle, String xLable, String yLable, Map<String, List<Point<Number>>> dataPointMap) {
         String plotName = plotDir + "/" + plotPrefix + plotSuffix;
         JavaPlot plot = new JavaPlot();
@@ -41,12 +40,16 @@ public class Plotter {
 //        plot.set("boxwidth",  "0.1 relative ");
         plot.set("style", "data boxes");
         plot.set("style", "fill pattern 1 border");
-        plot.set("xtics", "1");
-        plot.set("xrange", "[0:5]");
+        plot.set("xtics", "1 nomirror");
+        plot.set("xrange", "[0.5:4.5]");
+        plot.set("grid", "y");
+//        plot.set("datafile missing" ,"'-'");
 //        plot.set("xtics", "border in scale 0 nomirror rotate by -45  autojustify");
-        plot.setTitle(plotTitle);
-        GNUPlotTerminal term = new PostscriptTerminal(plotName);
-        plot.setTerminal(term);
+        if (addTitle) plot.setTitle(plotTitle);
+//        GNUPlotTerminal term = new PostscriptTerminal(plotName);
+//        plot.setTerminal(term);
+        plot.set("term", "postscript eps noenhanced color font ',20'");
+        plot.set("output", "'" + plotName + "'");
         plot.plot();
         return plot;
     }
@@ -79,11 +82,14 @@ public class Plotter {
         plot.set("xzeroaxis", "");
         plot.set("style", "data boxes");
         plot.set("style", "fill pattern 1 border");
-        plot.set("xtics", "1");
-        plot.set("xrange", "[0:5]");
-        plot.setTitle(plotTitle);
-        GNUPlotTerminal term = new PostscriptTerminal(plotName);
-        plot.setTerminal(term);
+        plot.set("xtics", "1 nomirror");
+        plot.set("xrange", "[0.5:4.5]");
+        plot.set("grid", "y");
+        if (addTitle) plot.setTitle(plotTitle);
+//        GNUPlotTerminal term = new PostscriptTerminal(plotName);
+//        plot.setTerminal(term);
+        plot.set("term", "postscript eps noenhanced color");
+        plot.set("output", "'" + plotName + "'");
         plot.plot();
         return plot;
     }
@@ -111,12 +117,15 @@ public class Plotter {
 //        plot.set("boxwidth",  "0.1 relative ");
         plot.set("style", "data boxes");
         plot.set("style", "fill pattern 1 border");
-        plot.set("xtics", "1");
-        plot.set("xrange", "[0:5]");
+        plot.set("xtics", "1 nomirror");
+        plot.set("xrange", "[0.5:4.5]");
+        plot.set("grid", "y");
 //        plot.set("xtics", "border in scale 0 nomirror rotate by -45  autojustify");
-        plot.setTitle(plotTitle);
-        GNUPlotTerminal term = new PostscriptTerminal(plotName);
-        plot.setTerminal(term);
+        if (addTitle) plot.setTitle(plotTitle);
+//        GNUPlotTerminal term = new PostscriptTerminal(plotName);
+//        plot.setTerminal(term);
+        plot.set("term", "postscript eps noenhanced color");
+        plot.set("output", "'" + plotName + "'");
         plot.plot();
         return plot;
     }
@@ -144,7 +153,7 @@ public class Plotter {
         plot.getAxis("x").setLabel(xLable);
         plot.getAxis("y").setLabel(yLable);
         plot.set("xzeroaxis", "");
-        plot.setTitle(plotTitle);
+        if (addTitle) plot.setTitle(plotTitle);
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
@@ -177,7 +186,7 @@ public class Plotter {
         plot.getAxis("x").setLabel(xLable);
         plot.getAxis("y").setLabel(y2Lable + " - " + yLable);
         plot.set("xzeroaxis", "");
-        plot.setTitle(plotTitle);
+        if (addTitle) plot.setTitle(plotTitle);
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
@@ -224,7 +233,7 @@ public class Plotter {
 //        plot.set("y2range", "[0:100]");
 //        plot.set("yrange", "[0:100]");
 //        plot.set("grid", "x y y2");
-        plot.setTitle(plotTitle);
+        if (addTitle) plot.setTitle(plotTitle);
         GNUPlotTerminal term = new PostscriptTerminal(plotName);
         plot.setTerminal(term);
         plot.plot();
@@ -240,17 +249,19 @@ public class Plotter {
         plotStyle.setStyle(Style.ERRORLINES);
 
         JavaPlot allPlot = new JavaPlot();
-        allPlot.set("term", "postscript eps size 11.7in,16.5in enhanced color");
+        allPlot.set("term", "postscript eps size 11.7in,16.5in noenhanced color");
         allPlot.set("output", "'" + plotName + "'");
         AutoGraphLayout layout = new AutoGraphLayout();
         layout.setColumns(3);
-//        layout.setRows(5);
+        layout.setRows(8);
         allPlot.getPage().setLayout(layout);
         allPlot.set("xzeroaxis", "");
 //        allPlot.set("style", "data boxes");
-//        allPlot.set("style", "fill pattern 1 border");
-        allPlot.set("xtics", "1");
+        allPlot.set("style", "fill pattern 1 border");
+        allPlot.set("xtics", "1 nomirror");
         allPlot.set("xrange", "[0:5]");
+        allPlot.set("grid", "y");
+//        allPlot.set("datafile missing" ,"'?'");
 
         for (JavaPlot javaPlot : plots) {
             for (Plot dsp : javaPlot.getPlots()) {
@@ -258,7 +269,7 @@ public class Plotter {
             }
             allPlot.getAxis("x").setLabel(javaPlot.getAxis("x").get("xlabel").split("'")[1]);
             // Dirty hack to reset title
-            allPlot.getAxis("y").setLabel(javaPlot.getAxis("y").get("ylabel").split("'")[1]  + "' \n set title '" + javaPlot.getParameters().get("title").split("'")[1]);
+            if (addTitle) allPlot.getAxis("y").setLabel(javaPlot.getAxis("y").get("ylabel").split("'")[1]  + "' \n set title '" + javaPlot.getParameters().get("title").split("'")[1]);
             allPlot.newGraph();
         }
         allPlot.setMultiTitle("All Plots");
